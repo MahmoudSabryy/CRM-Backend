@@ -1,6 +1,7 @@
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -40,8 +41,18 @@ export class Contact {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @OneToMany(() => User, (user) => user.id)
+  @DeleteDateColumn()
+  deletedAt: Date;
+
+  @ManyToOne(() => User, (user) => user.id)
   updatedBy: User;
+
+  @ManyToOne(() => User, (user) => user.deletedContact, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'deletedById' })
+  deletedBy: User;
 
   @ManyToOne(() => User, (user) => user.contacts)
   owner: User;

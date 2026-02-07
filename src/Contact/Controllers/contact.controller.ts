@@ -1,9 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
-  Patch,
   Post,
   Put,
   Req,
@@ -108,7 +108,7 @@ export class ContactController {
 
   @Put('update/:contactId')
   @UseGuards(AuthGuard, RoleGuard)
-  @Roles([`${UserRole.Admin}`, `${UserRole.Manager}`])
+  @Roles([`${UserRole.Admin}`, `${UserRole.Manager}`, `${UserRole.SalesRep}`])
   async updateContactHandler(
     @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
     body: UpdateContactDTO,
@@ -148,5 +148,27 @@ export class ContactController {
     return res
       .status(200)
       .json({ success: true, message: 'All Contact Deals :', data: results });
+  }
+
+  @Delete('delete/:contactId')
+  @UseGuards(AuthGuard, RoleGuard)
+  @Roles([`${UserRole.Admin}`, `${UserRole.Manager}`, `${UserRole.SalesRep}`])
+  async softDeleteContactHandler(
+    @Param('contactId') contactId: string,
+    @Req() req: express.Request,
+    @Res() res: express.Response,
+  ) {
+    const authUser: IAuthUser = req['authUser'];
+
+    const results = await this._ContactService.softDeleteContactService(
+      contactId,
+      authUser,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Contact Deleted Successfully :',
+      data: results,
+    });
   }
 }

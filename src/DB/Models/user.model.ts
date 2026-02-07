@@ -5,6 +5,8 @@ import {
   DeleteDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
@@ -46,6 +48,16 @@ export class User {
 
   @Column({ type: 'text', nullable: true })
   address: string;
+
+  @OneToMany(() => Contact, (contact) => contact.updatedBy, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'updatedById' })
+  updatedContact: Contact[];
+
+  @OneToMany(() => Contact, (contact) => contact.deletedBy)
+  deletedContact: Contact[];
 
   /* one user to many leads */
   @OneToMany(() => Lead, (lead) => lead.owner)

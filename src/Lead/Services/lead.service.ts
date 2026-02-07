@@ -15,12 +15,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Lead } from 'src/DB/Models/lead.model';
 import { Not, Repository } from 'typeorm';
 import { User } from 'src/DB/Models/user.model';
+import { Contact } from 'src/DB/Models/contact.model';
 
 @Injectable()
 export class LeadService {
   constructor(
     @InjectRepository(Lead) private readonly _LeadRepo: Repository<Lead>,
     @InjectRepository(User) private readonly _UserRepo: Repository<User>,
+    @InjectRepository(Contact)
+    private readonly _ContactRepo: Repository<Contact>,
   ) {}
 
   async createLeadService(body: CreateLeadDTO, authUser: IAuthUser) {
@@ -31,6 +34,14 @@ export class LeadService {
     });
 
     if (lead) throw new ConflictException('Lead already exist');
+
+    const contact = await this._ContactRepo.findOne({
+      where: [{ email }, { phone }],
+    });
+    if (contact)
+      throw new ConflictException(
+        'There is a contact with this email or phone',
+      );
 
     const newLead = this._LeadRepo.create({
       email,

@@ -38,7 +38,11 @@ export class ContactService {
       throw new BadRequestException('Lead must be qualified before conversion');
 
     const contact = await this._ContactRepo.findOne({
-      where: { lead: { id: lead.id } },
+      where: [
+        { lead: { id: lead.id } },
+        { phone: lead.phone },
+        { email: lead.email },
+      ],
     });
 
     if (contact) throw new ConflictException('contact already exist');
@@ -86,17 +90,22 @@ export class ContactService {
   async getAllContactsService(authUser: IAuthUser) {
     if (authUser.role === UserRole.SalesRep) {
       return await this._ContactRepo.find({
+        relations: { owner: true, activities: { user: true }, deals: true },
         where: { owner: { id: authUser.id } },
       });
     } else {
-      return await this._ContactRepo.find();
+      return await this._ContactRepo.find({
+        relations: { owner: true, activities: true, deals: true },
+      });
     }
   }
 
   async createContactService(authUser: IAuthUser, body: CreateContactDTO) {
     const { name, email, phone, company } = body;
 
-    const lead = await this._LeadRepo.findOne({ where: { phone } });
+    const lead = await this._LeadRepo.findOne({
+      where: [{ phone }, { email }],
+    });
 
     if (lead) {
       return await this.convertLeadTOContactService(
@@ -106,6 +115,10 @@ export class ContactService {
       );
     }
 
+    const contactExist = await this._ContactRepo.findOne({
+      where: [{ phone }, { email }],
+    });
+    if (contactExist) throw new ConflictException('contact already exist');
     const contact = this._ContactRepo.create({
       name,
       email,
@@ -163,7 +176,7 @@ export class ContactService {
 
       contact.company = company;
     }
-
+    contact.updatedBy = authUser as any;
     return await this._ContactRepo.save(contact);
   }
 
@@ -176,5 +189,13 @@ export class ContactService {
 
     if (!contact) throw new NotFoundException('contact not found');
     return contact;
+  }
+
+  async softDeleteContactService(contactId: string, authUser: IAuthUser) {
+    const contact = await this.getSingleContactService(contactId, authUser);
+
+    await this._ContactRepo.update(contact.id, { deletedBy: authUser as any });
+
+    return await this._ContactRepo.softDelete(contact.id);
   }
 }

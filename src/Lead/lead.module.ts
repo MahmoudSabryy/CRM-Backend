@@ -6,9 +6,10 @@ import { JwtService } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from 'src/DB/Models/user.model';
 import { Lead } from 'src/DB/Models/lead.model';
+import { Contact } from 'src/DB/Models/contact.model';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Lead])],
+  imports: [TypeOrmModule.forFeature([User, Lead, Contact])],
   controllers: [LeadController],
   providers: [LeadService, TokenService, JwtService],
 })

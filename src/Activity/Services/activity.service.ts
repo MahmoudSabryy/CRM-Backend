@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ActivityType, IAuthUser, UserRole } from 'src/Common/Types/Types';
+import { IAuthUser, UserRole } from 'src/Common/Types/Types';
 import { Activity } from 'src/DB/Models/activity.model';
 import { Repository } from 'typeorm';
 import { CreateActivityDTO, UpdateActivityDTO } from '../DTO/activity.dto';

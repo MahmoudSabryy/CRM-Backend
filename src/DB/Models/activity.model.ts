@@ -1,6 +1,7 @@
 import { ActivityType } from 'src/Common/Types/Types';
 import {
   Column,
+  CreateDateColumn,
   DeleteDateColumn,
   Entity,
   JoinColumn,
@@ -28,6 +29,9 @@ export class Activity {
 
   @DeleteDateColumn()
   deletedAt: Date;
+
+  @CreateDateColumn()
+  createdAt: Date;
 
   @ManyToOne(() => User, (user) => user.deletedActivities, {
     nullable: true,

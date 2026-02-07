@@ -53,7 +53,7 @@ export class DealController {
     });
   }
 
-  @Get()
+  @Post()
   @UseGuards(AuthGuard, RoleGuard)
   @Roles([`${UserRole.Admin}`, `${UserRole.Manager}`, `${UserRole.SalesRep}`])
   async getAllUserDealsHandler(
