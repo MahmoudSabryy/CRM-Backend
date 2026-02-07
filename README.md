@@ -58,29 +58,22 @@ Role Permissions
 Admin Full access
 Manager Manage users, deals, reports
 Sales person Manage assigned leads & deals
+
 🧱 Tech Stack
 
 Backend
 
 Node.js
 
-Express / NestJS
+NestJS
 
-MongoDB / PostgreSQL
+PostgreSQL
 
-Prisma / Mongoose
+TypeORM
 
 JWT Authentication
 
-Utilities
-
-Zod validation
-
-Bcrypt
-
-Multer
-
-Nodemailer
+Bcryptjs
 
 📐 System Architecture
 Client (React)
