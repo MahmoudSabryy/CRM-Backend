@@ -76,42 +76,7 @@ JWT Authentication
 Bcryptjs
 
 📐 System Architecture
-Client (React)
-|
-API Gateway
-|
-Auth Middleware
-|
-Controllers
-|
-Services
-|
-Repositories
-|
-Database
-
-🗂 Folder Structure
-src/
-├
-│── App/
-│── Auth/
-│── Users/
-│── Leads/
-│── Contacts/
-│── Deals/
-│── Activities/
-│── DB/
-│
-│
-├── common/
-│ ├── Decoratores/
-│ ├── Guards/
-│ ├── Security/
-│ ├── Types/
-│ └── Services/
-│
-├── .env
-└── main.ts
+Client (React) -> API Gateway -> Auth Middleware -> Controllers -> Services -> Repositories -> Database
 
 ▶ Run Locally
 npm install
