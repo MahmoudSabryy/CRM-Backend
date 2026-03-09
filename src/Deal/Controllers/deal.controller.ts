@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -17,12 +18,7 @@ import { RoleGuard } from 'src/Common/Guards/Role.Guard';
 import { Roles } from 'src/Common/Decorators/roles.decorator';
 import { IAuthUser, UserRole } from 'src/Common/Types/Types';
 import express from 'express';
-import {
-  CloseDealDTO,
-  CreateDealDTO,
-  GetAllUserDealsDTO,
-  UpdateDealDTO,
-} from '../DTO/deal.dto';
+import { CloseDealDTO, CreateDealDTO, UpdateDealDTO } from '../DTO/deal.dto';
 
 @Controller('deal')
 export class DealController {
@@ -53,21 +49,16 @@ export class DealController {
     });
   }
 
-  @Post()
+  @Get('')
   @UseGuards(AuthGuard, RoleGuard)
   @Roles([`${UserRole.Admin}`, `${UserRole.Manager}`, `${UserRole.SalesRep}`])
   async getAllUserDealsHandler(
-    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-    body: GetAllUserDealsDTO,
     @Req() req: express.Request,
     @Res() res: express.Response,
   ) {
     const authUser: IAuthUser = req['authUser'];
 
-    const results = await this._DealService.getAllUserDealsService(
-      authUser,
-      body,
-    );
+    const results = await this._DealService.getAllUserDealsService(authUser);
 
     return res
       .status(200)
@@ -157,6 +148,28 @@ export class DealController {
     return res.status(200).json({
       success: true,
       message: 'Deal Closed Successfully :',
+      data: results,
+    });
+  }
+
+  @Delete('delete/:dealId')
+  @UseGuards(AuthGuard, RoleGuard)
+  @Roles([`${UserRole.Admin}`, `${UserRole.Manager}`, `${UserRole.SalesRep}`])
+  async softDeleteDealHandler(
+    @Param('dealId') dealId: string,
+    @Req() req: express.Request,
+    @Res() res: express.Response,
+  ) {
+    const authUser: IAuthUser = req['authUser'];
+
+    const results = await this._DealService.softDeleteDealService(
+      dealId,
+      authUser,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Deal soft deleted successfully :',
       data: results,
     });
   }

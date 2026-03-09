@@ -8,7 +8,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IAuthUser, LeadStatus, UserRole } from 'src/Common/Types/Types';
 import { Contact } from 'src/DB/Models/contact.model';
 import { Lead } from 'src/DB/Models/lead.model';
-import { LeadService } from 'src/Lead/Services/lead.service';
 import { Repository } from 'typeorm';
 import {
   ConvertLeadToContactDTO,
@@ -16,6 +15,8 @@ import {
   UpdateContactDTO,
 } from '../DTO/contact.dto';
 import { User } from 'src/DB/Models/user.model';
+import { ContactStrategyFactory } from '../Strategies/contact-strategy.factory';
+import { LeadStrategyFactory } from 'src/Lead/Strategies/lead-strategy.factory';
 
 @Injectable()
 export class ContactService {
@@ -23,8 +24,8 @@ export class ContactService {
     @InjectRepository(Lead) private readonly _LeadRepo: Repository<Lead>,
     @InjectRepository(Contact)
     private readonly _ContactRepo: Repository<Contact>,
-
-    private readonly _LeadService: LeadService,
+    private readonly _ContactStrategyFactory: ContactStrategyFactory,
+    private readonly _LeadStrategyFactory: LeadStrategyFactory,
   ) {}
 
   async convertLeadTOContactService(
@@ -32,100 +33,67 @@ export class ContactService {
     leadId: string,
     authUser: IAuthUser,
   ) {
-    const { company } = body;
-    const lead = await this._LeadService.getSingleLeadService(authUser, leadId);
+    const { lead, company } = body;
+
     if (lead.status !== LeadStatus.Qualified)
       throw new BadRequestException('Lead must be qualified before conversion');
 
-    const contact = await this._ContactRepo.findOne({
-      where: [
-        { lead: { id: lead.id } },
-        { phone: lead.phone },
-        { email: lead.email },
-      ],
+    const Contact = this._ContactRepo.create({
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      lead: lead as Lead,
+      owner: authUser as User,
     });
+    lead.status = LeadStatus.Converted;
 
-    if (contact) throw new ConflictException('contact already exist');
+    await this._LeadRepo.save(lead);
 
-    return await this._LeadRepo.manager.transaction(async (manager) => {
-      const contact = manager.create(Contact, {
-        email: lead.email,
-        name: lead.name,
-        phone: lead.phone,
-        lead: lead,
-        company: company ?? 'Unknown',
-        owner: authUser as any,
-      });
-
-      await manager.save(contact);
-      lead.contact = contact;
-      lead.status = LeadStatus.Converted;
-
-      await manager.save(lead);
-
-      return contact;
-    });
+    return await this._ContactRepo.save(Contact);
   }
 
-  async getSingleContactService(contactId: string, authUser: IAuthUser) {
-    if (authUser.role === UserRole.SalesRep) {
-      const contact = await this._ContactRepo.findOne({
-        where: { id: contactId, owner: { id: authUser.id } },
-      });
+  async getSingleContactService(
+    contactId: string,
+    authUser: IAuthUser,
+  ): Promise<Contact> {
+    const strategy = this._ContactStrategyFactory.getStrategy(authUser.role);
 
-      if (!contact) throw new NotFoundException('contact not found');
-
-      return contact;
-    } else {
-      const contact = await this._ContactRepo.findOne({
-        where: { id: contactId },
-      });
-
-      if (!contact) throw new NotFoundException('contact not found');
-
-      return contact;
-    }
+    return await strategy.getContactById(contactId, authUser as User);
   }
 
-  async getAllContactsService(authUser: IAuthUser) {
-    if (authUser.role === UserRole.SalesRep) {
-      return await this._ContactRepo.find({
-        relations: { owner: true, activities: { user: true }, deals: true },
-        where: { owner: { id: authUser.id } },
-      });
-    } else {
-      return await this._ContactRepo.find({
-        relations: { owner: true, activities: true, deals: true },
-      });
-    }
+  async getAllContactsService(authUser: IAuthUser): Promise<Contact[]> {
+    const strategy = this._ContactStrategyFactory.getStrategy(authUser.role);
+
+    return await strategy.getAllContacts(authUser as User);
   }
 
   async createContactService(authUser: IAuthUser, body: CreateContactDTO) {
-    const { name, email, phone, company } = body;
+    const { email, phone } = body;
+
+    const leadStrategy = this._LeadStrategyFactory.getStrategy(authUser.role);
+    const ContactStrategy = this._ContactStrategyFactory.getStrategy(
+      authUser.role,
+    );
 
     const lead = await this._LeadRepo.findOne({
-      where: [{ phone }, { email }],
+      where: [{ email }, { phone }],
     });
 
-    if (lead) {
-      return await this.convertLeadTOContactService(
-        { company },
-        lead.id,
-        authUser,
+    if (lead)
+      throw new ConflictException(
+        'There is a lead with the same email or phone',
       );
-    }
 
     const contactExist = await this._ContactRepo.findOne({
       where: [{ phone }, { email }],
     });
-    if (contactExist) throw new ConflictException('contact already exist');
-    const contact = this._ContactRepo.create({
-      name,
-      email,
-      phone,
-      company,
-      owner: authUser as User,
-    });
+
+    if (contactExist)
+      throw new ConflictException(
+        'There is a contact with the same email or phone',
+      );
+
+    const contact = await ContactStrategy.createContact(body, authUser as User);
 
     return await this._ContactRepo.save(contact);
   }
@@ -176,26 +144,20 @@ export class ContactService {
 
       contact.company = company;
     }
-    contact.updatedBy = authUser as any;
+
+    contact.updatedAt = new Date();
+    contact.updatedBy = authUser as User;
+
     return await this._ContactRepo.save(contact);
-  }
-
-  async getAllContactDealsService(contactId: string, authUser: IAuthUser) {
-    const contact = await this._ContactRepo.findOne({
-      relations: { deals: true },
-      where: { id: contactId },
-      select: { id: true, name: true, phone: true, deals: true },
-    });
-
-    if (!contact) throw new NotFoundException('contact not found');
-    return contact;
   }
 
   async softDeleteContactService(contactId: string, authUser: IAuthUser) {
     const contact = await this.getSingleContactService(contactId, authUser);
 
-    await this._ContactRepo.update(contact.id, { deletedBy: authUser as any });
+    const strategy = this._ContactStrategyFactory.getStrategy(authUser.role);
 
-    return await this._ContactRepo.softDelete(contact.id);
+    await strategy.deleteContact(contact, authUser as User);
+
+    return await this._ContactRepo.save(contact);
   }
 }

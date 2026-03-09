@@ -8,24 +8,41 @@ import { IAuthUser, UserRole } from 'src/Common/Types/Types';
 import { Activity } from 'src/DB/Models/activity.model';
 import { Repository } from 'typeorm';
 import { CreateActivityDTO, UpdateActivityDTO } from '../DTO/activity.dto';
-import { LeadService } from 'src/Lead/Services/lead.service';
-import { ContactService } from 'src/Contact/Services/contact.service';
-import { DealService } from 'src/Deal/Services/deal.service';
+import { Lead } from 'src/DB/Models/lead.model';
+import { Contact } from 'src/DB/Models/contact.model';
+import { Deal } from 'src/DB/Models/deal.model';
 
 @Injectable()
 export class ActivityService {
   constructor(
     @InjectRepository(Activity)
     private readonly _ActivityRepo: Repository<Activity>,
-    private readonly _LeadService: LeadService,
-    private readonly _ContactService: ContactService,
-    private readonly _DealService: DealService,
+
+    @InjectRepository(Lead)
+    private readonly _LeadRepo: Repository<Lead>,
+
+    @InjectRepository(Contact)
+    private readonly _ContactRepo: Repository<Contact>,
+
+    @InjectRepository(Deal)
+    private readonly _DealRepo: Repository<Deal>,
   ) {}
 
   async getAllUserActivitiesService(authUser: IAuthUser) {
-    const activities = await this._ActivityRepo.find({
-      where: { user: { id: authUser.id } },
-    });
+    let activities;
+
+    if (authUser.role === 'admin') {
+      // الآدمن يشوف كل الأنشطة
+      activities = await this._ActivityRepo.find({
+        relations: { contact: true, deal: true, lead: true, user: true },
+      });
+    } else {
+      // اليوزر العادي يشوف نشاطاته فقط
+      activities = await this._ActivityRepo.find({
+        relations: { contact: true, deal: true, lead: true, user: true },
+        where: { user: { id: authUser.id } },
+      });
+    }
 
     return activities;
   }
@@ -58,7 +75,9 @@ export class ActivityService {
   ) {
     const { type, note, activityDate } = body;
 
-    const lead = await this._LeadService.getSingleLeadService(authUser, leadId);
+    const lead = await this._LeadRepo.findOne({ where: { id: leadId } });
+
+    if (!lead) throw new NotFoundException('Lead not found');
 
     const activity = this._ActivityRepo.create({
       type,
@@ -77,10 +96,11 @@ export class ActivityService {
     authUser: IAuthUser,
   ) {
     const { type, note, activityDate } = body;
-    const contact = await this._ContactService.getSingleContactService(
-      contactId,
-      authUser,
-    );
+    const contact = await this._ContactRepo.findOne({
+      where: { id: contactId },
+    });
+    if (!contact) throw new NotFoundException('Contact not found');
+
     const activity = this._ActivityRepo.create({
       type,
       note,
@@ -99,7 +119,9 @@ export class ActivityService {
   ) {
     const { type, note, activityDate } = body;
 
-    const deal = await this._DealService.getSingleDealService(dealId, authUser);
+    const deal = await this._DealRepo.findOne({ where: { id: dealId } });
+
+    if (!deal) throw new NotFoundException('Deal not found');
 
     const activity = this._ActivityRepo.create({
       type,

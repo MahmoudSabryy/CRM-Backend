@@ -2,6 +2,7 @@ import { DealStatus, StageType } from 'src/Common/Types/Types';
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
@@ -44,6 +45,9 @@ export class Deal {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @DeleteDateColumn()
+  deletedAt: Date;
 
   @ManyToOne(() => Contact, (contact) => contact.deals, {
     onDelete: 'CASCADE',

@@ -11,7 +11,7 @@ import { Deal } from '../Models/deal.model';
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: 'localhost',
-      database: 'crm',
+      database: 'CRM',
       port: 5432,
       username: 'postgres',
       password: '123456',

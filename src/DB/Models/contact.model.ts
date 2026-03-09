@@ -32,7 +32,7 @@ export class Contact {
   @Column({ type: 'varchar', nullable: false })
   phone: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', nullable: true })
   company: string;
 
   @CreateDateColumn()

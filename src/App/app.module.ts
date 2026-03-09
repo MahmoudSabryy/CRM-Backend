@@ -8,6 +8,8 @@ import { LeadModule } from 'src/Lead/lead.module';
 import { ContactModule } from 'src/Contact/contact.module';
 import { DealModule } from 'src/Deal/deal.module';
 import { ActivityModule } from 'src/Activity/activity.module';
+import { DashboardModule } from 'src/Dashboard/dashboard.module';
+import { ReportModule } from 'src/Reports/report.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { ActivityModule } from 'src/Activity/activity.module';
     ContactModule,
     DealModule,
     ActivityModule,
+    DashboardModule,
+    ReportModule,
   ],
   controllers: [AppController],
   providers: [AppService],

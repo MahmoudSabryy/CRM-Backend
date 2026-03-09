@@ -25,7 +25,7 @@ export class ActivityController {
 
   @Get('user')
   @UseGuards(AuthGuard, RoleGuard)
-  @Roles([`${UserRole.SalesRep}`])
+  @Roles([`${UserRole.SalesRep}`, `${UserRole.Manager}`, `${UserRole.Admin}`])
   async getAllUserActivitiesHandler(
     @Req() req: express.Request,
     @Res() res: express.Response,
@@ -84,6 +84,7 @@ export class ActivityController {
       data: results,
     });
   }
+
   @Post('contact/:contactId')
   @UseGuards(AuthGuard, RoleGuard)
   @Roles([`${UserRole.Admin}`, `${UserRole.Manager}`, `${UserRole.SalesRep}`])

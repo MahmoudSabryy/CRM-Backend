@@ -10,6 +10,7 @@ import {
   OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.model';
 import { Activity } from './activity.model';
@@ -49,6 +50,9 @@ export class Lead {
 
   @DeleteDateColumn()
   deletedAt?: Date;
+
+  @UpdateDateColumn()
+  updatedAt?: Date;
 
   @ManyToOne(() => User, (user) => user.deletedLead, {
     nullable: true,

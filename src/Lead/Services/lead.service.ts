@@ -10,128 +10,129 @@ import {
   UpdateLeadDTO,
   updateLeadStatusDTO,
 } from '../DTO/lead.dto';
-import { IAuthUser, LeadStatus, UserRole } from 'src/Common/Types/Types';
+import { IAuthUser, UserRole } from 'src/Common/Types/Types';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Lead } from 'src/DB/Models/lead.model';
 import { Not, Repository } from 'typeorm';
 import { User } from 'src/DB/Models/user.model';
 import { Contact } from 'src/DB/Models/contact.model';
+import { LeadStrategyFactory } from '../Strategies/lead-strategy.factory';
+import { ILeadStrategy } from '../Strategies/lead.strategy.interface';
 
 @Injectable()
 export class LeadService {
   constructor(
     @InjectRepository(Lead) private readonly _LeadRepo: Repository<Lead>,
+
     @InjectRepository(User) private readonly _UserRepo: Repository<User>,
+
     @InjectRepository(Contact)
     private readonly _ContactRepo: Repository<Contact>,
+
+    private readonly _LeadStrategyFactory: LeadStrategyFactory,
   ) {}
 
-  async createLeadService(body: CreateLeadDTO, authUser: IAuthUser) {
-    const { email, name, phone, source } = body;
+  async createLeadService(
+    body: CreateLeadDTO,
+    authUser: IAuthUser,
+  ): Promise<Lead> {
+    const { email, phone } = body;
 
-    const lead = await this._LeadRepo.findOne({
-      where: [{ email }, { phone }],
+    const leadExist = await this._LeadRepo.findOne({
+      where: [{ email: email }, { phone: phone }],
     });
 
-    if (lead) throw new ConflictException('Lead already exist');
+    if (leadExist) throw new ConflictException('lead already exist');
 
-    const contact = await this._ContactRepo.findOne({
-      where: [{ email }, { phone }],
+    const contactExist = await this._ContactRepo.findOne({
+      where: [{ email: email }, { phone: phone }],
     });
-    if (contact)
+
+    if (contactExist)
       throw new ConflictException(
-        'There is a contact with this email or phone',
+        'There is a contact with the same email or phone',
       );
 
-    const newLead = this._LeadRepo.create({
-      email,
-      name,
-      phone,
-      source,
-      owner: { id: authUser.id },
-    });
+    const strategy: ILeadStrategy = this._LeadStrategyFactory.getStrategy(
+      authUser.role,
+    );
 
-    return await this._LeadRepo.save(newLead);
+    const lead = await strategy.createLead(body, authUser as User);
+
+    return await this._LeadRepo.save(lead);
   }
 
-  async getAllLeadsService(authUser: IAuthUser) {
-    const role = authUser.role;
+  async getAllLeadsService(authUser: IAuthUser): Promise<Lead[]> {
+    const strategy: ILeadStrategy = this._LeadStrategyFactory.getStrategy(
+      authUser.role,
+    );
 
-    if (role === UserRole.Admin || role === UserRole.Manager) {
-      return await this._LeadRepo.find({
-        relations: { activities: true },
-        where: { status: Not(LeadStatus.Converted) },
-      });
-    }
-    if (role === UserRole.SalesRep) {
-      return await this._LeadRepo.find({
-        relations: { activities: true },
-        where: {
-          owner: { id: authUser.id },
-          status: Not(LeadStatus.Converted),
-        },
-      });
-    }
+    return await strategy.getLeads(authUser as User);
   }
 
-  async getSingleLeadService(authUser: IAuthUser, leadId: string) {
-    if (authUser.role === UserRole.SalesRep) {
-      const lead = await this._LeadRepo.findOne({
-        where: { id: leadId, owner: { id: authUser.id } },
-        relations: { owner: true, contact: true },
-      });
+  async getSingleLeadService(
+    authUser: IAuthUser,
+    leadId: string,
+  ): Promise<Lead> {
+    const strategy: ILeadStrategy = this._LeadStrategyFactory.getStrategy(
+      authUser.role,
+    );
 
-      if (!lead) throw new NotFoundException('lead not found');
-      return lead;
-    } else {
-      const lead = await this._LeadRepo.findOne({
-        where: { id: leadId },
-        relations: { owner: true, contact: true },
-      });
-
-      if (!lead) throw new NotFoundException('lead not found');
-      return lead;
-    }
+    return await strategy.getLeadById(leadId, authUser as User);
   }
 
   async updateLeadService(
     authUser: IAuthUser,
     leadId: string,
     body: UpdateLeadDTO,
-  ) {
-    const lead = await this.getSingleLeadService(authUser, leadId);
-
+  ): Promise<Lead> {
     const { email, name, phone, source } = body;
 
-    if (!email && !name && !phone && !source)
-      throw new BadRequestException('Nothing to update');
+    if (!email && !name && !phone && !source) {
+      throw new BadRequestException(
+        'At least one field must be provided for update',
+      );
+    }
+
+    const strategy = this._LeadStrategyFactory.getStrategy(authUser.role);
+
+    const lead = await strategy.getLeadById(leadId, authUser as User);
 
     if (email) {
-      if (await this._LeadRepo.findOne({ where: { email } }))
-        throw new ConflictException('email already exist');
-
-      if (email.toLowerCase() === lead.email.toLowerCase())
-        throw new BadRequestException("can't update lead with the same email");
+      if (email.toLowerCase() === lead.email.toLowerCase()) {
+        throw new BadRequestException('Lead already has this email');
+      }
+      if (await this._ContactRepo.findOne({ where: { email } })) {
+        throw new ConflictException('There is a contact with the same email');
+      }
       lead.email = email;
     }
-    if (name) {
-      if (name.toLowerCase() === lead.name.toLowerCase())
-        throw new BadRequestException("can't update lead with the same name");
-      lead.name = name;
-    }
-    if (phone) {
-      if (await this._LeadRepo.findOne({ where: { phone } }))
-        throw new ConflictException('phone number already exist');
 
-      if (phone === lead.phone)
-        throw new BadRequestException("can't update lead with the same phone");
+    if (phone) {
+      if (phone === lead.phone) {
+        throw new BadRequestException('Lead already has this phone');
+      }
+      if (await this._ContactRepo.findOne({ where: { phone } })) {
+        throw new ConflictException('There is a contact with the same phone');
+      }
       lead.phone = phone;
     }
+
+    if (name) {
+      if (name.toLowerCase() === lead.name.toLowerCase()) {
+        throw new BadRequestException('Lead already has this name');
+      }
+      lead.name = name;
+    }
+
     if (source) {
-      if (source.toLowerCase() === lead.source)
-        throw new BadRequestException("can't update lead with the same source");
+      if (source === lead.source) {
+        throw new BadRequestException('Lead already has this source');
+      }
       lead.source = source;
     }
+
+    await strategy.updateLead(lead, body, authUser as User);
 
     return await this._LeadRepo.save(lead);
   }
@@ -140,16 +141,19 @@ export class LeadService {
     body: assignLeadDTO,
     leadId: string,
     authUser: IAuthUser,
-  ) {
+  ): Promise<Lead> {
     const { owner } = body;
-    const lead = await this.getSingleLeadService(authUser, leadId);
 
-    const user = await this._UserRepo.findOne({ where: { id: owner } });
+    const strategy = this._LeadStrategyFactory.getStrategy(authUser.role);
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-    lead.owner = user;
+    const lead = await strategy.getLeadById(leadId, authUser as User);
+
+    const newOwner = await this._UserRepo.findOne({
+      where: { id: owner, role: UserRole.SalesRep },
+    });
+    if (!newOwner) throw new NotFoundException('New owner not found');
+
+    await strategy.assignLead(lead, newOwner);
 
     return await this._LeadRepo.save(lead);
   }
@@ -158,25 +162,32 @@ export class LeadService {
     authUser: IAuthUser,
     leadId: string,
     body: updateLeadStatusDTO,
-  ) {
-    const lead = await this.getSingleLeadService(authUser, leadId);
+  ): Promise<Lead> {
     const { status } = body;
 
-    if (lead.status === status)
-      throw new BadRequestException('Lead already has this status');
+    const strategy = this._LeadStrategyFactory.getStrategy(authUser.role);
 
-    lead.status = status;
+    const lead = await strategy.getLeadById(leadId, authUser as User);
 
-    return this._LeadRepo.save(lead);
+    if (lead.status === status) {
+      throw new BadRequestException(`Lead already has status ${status}`);
+    }
+
+    await strategy.updateLeadStatus(lead, status);
+
+    return await this._LeadRepo.save(lead);
   }
 
-  async softDeleteLeadService(leadId: string, authUser: IAuthUser) {
-    const lead = await this.getSingleLeadService(authUser, leadId);
+  async softDeleteLeadService(
+    leadId: string,
+    authUser: IAuthUser,
+  ): Promise<Lead> {
+    const strategy = this._LeadStrategyFactory.getStrategy(authUser.role);
 
-    await this._LeadRepo.update(lead.id, {
-      deletedBy: authUser as any,
-    });
+    const lead = await strategy.getLeadById(leadId, authUser as User);
 
-    return await this._LeadRepo.softDelete(lead.id);
+    await strategy.deleteLead(lead, authUser as User);
+
+    return await this._LeadRepo.save(lead);
   }
 }

@@ -17,7 +17,11 @@ import { RoleGuard } from 'src/Common/Guards/Role.Guard';
 import { Roles } from 'src/Common/Decorators/roles.decorator';
 import { IAuthUser, UserRole } from 'src/Common/Types/Types';
 import express from 'express';
-import { CreateContactDTO, UpdateContactDTO } from '../DTO/contact.dto';
+import {
+  ConvertLeadToContactDTO,
+  CreateContactDTO,
+  UpdateContactDTO,
+} from '../DTO/contact.dto';
 @Controller('contact')
 export class ContactController {
   constructor(private readonly _ContactService: ContactService) {}
@@ -50,7 +54,7 @@ export class ContactController {
   @Roles([`${UserRole.Admin}`, `${UserRole.Manager}`, `${UserRole.SalesRep}`])
   async convertLeadTOContactHandler(
     @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-    body: CreateContactDTO,
+    body: ConvertLeadToContactDTO,
     @Param('leadId') leadId: string,
     @Req() req: express.Request,
     @Res() res: express.Response,
@@ -128,26 +132,6 @@ export class ContactController {
       message: 'contact updated successfully ✅',
       data: results,
     });
-  }
-
-  @Get('deals/:contactId')
-  @UseGuards(AuthGuard, RoleGuard)
-  @Roles([`${UserRole.Admin}`, `${UserRole.Manager}`, `${UserRole.SalesRep}`])
-  async getAllContactDealsHandler(
-    @Param('contactId') contactId: string,
-    @Req() req: express.Request,
-    @Res() res: express.Response,
-  ) {
-    const authUser: IAuthUser = req['authUser'];
-
-    const results = await this._ContactService.getAllContactDealsService(
-      contactId,
-      authUser,
-    );
-
-    return res
-      .status(200)
-      .json({ success: true, message: 'All Contact Deals :', data: results });
   }
 
   @Delete('delete/:contactId')

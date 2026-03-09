@@ -12,12 +12,7 @@ import {
 } from 'src/Common/Types/Types';
 import { Deal } from 'src/DB/Models/deal.model';
 import { Repository } from 'typeorm';
-import {
-  CloseDealDTO,
-  CreateDealDTO,
-  GetAllUserDealsDTO,
-  UpdateDealDTO,
-} from '../DTO/deal.dto';
+import { CloseDealDTO, CreateDealDTO, UpdateDealDTO } from '../DTO/deal.dto';
 import { Contact } from 'src/DB/Models/contact.model';
 
 @Injectable()
@@ -57,25 +52,22 @@ export class DealService {
     return await this._DealRepo.save(deal);
   }
 
-  async getAllUserDealsService(authUser: IAuthUser, body: GetAllUserDealsDTO) {
-    const { userId } = body;
-
+  async getAllUserDealsService(authUser: IAuthUser) {
     if (authUser.role === UserRole.SalesRep) {
-      const deals = await this._DealRepo.find({
+      return await this._DealRepo.find({
+        relations: { owner: true, contact: true, activities: true },
         where: { owner: { id: authUser.id } },
       });
-      return deals;
-    } else {
-      const deals = await this._DealRepo.find({
-        where: { owner: { id: userId } },
-      });
-      return deals;
     }
+    return await this._DealRepo.find({
+      relations: { owner: true, contact: true, activities: true },
+    });
   }
 
   async getSingleDealService(dealId: string, authUser: IAuthUser) {
     if (authUser.role === UserRole.SalesRep) {
       const deal = await this._DealRepo.findOne({
+        relations: { owner: true, contact: true, activities: true },
         where: { owner: { id: authUser.id }, id: dealId },
       });
 
@@ -83,6 +75,7 @@ export class DealService {
       return deal;
     } else {
       const deal = await this._DealRepo.findOne({
+        relations: { owner: true, contact: true, activities: true },
         where: { id: dealId },
       });
 
@@ -240,5 +233,11 @@ export class DealService {
     deal.closedAt = new Date();
 
     return this._DealRepo.save(deal);
+  }
+
+  async softDeleteDealService(dealId: string, authUser: IAuthUser) {
+    const deal = await this.getSingleDealService(dealId, authUser);
+
+    return await this._DealRepo.softDelete(deal.id);
   }
 }

@@ -7,11 +7,34 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from 'src/DB/Models/user.model';
 import { Lead } from 'src/DB/Models/lead.model';
 import { Contact } from 'src/DB/Models/contact.model';
-import { LeadService } from 'src/Lead/Services/lead.service';
+import { ContactAdminStrategy } from './Strategies/contact-admin.strategy';
+import { ContactSalestrategy } from './Strategies/contact-sales.strategy';
+import { ContactStrategyFactory } from './Strategies/contact-strategy.factory';
+import { LeadModule } from 'src/Lead/lead.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Lead, Contact])],
+  imports: [TypeOrmModule.forFeature([User, Lead, Contact]), LeadModule],
   controllers: [ContactController],
-  providers: [ContactService, TokenService, JwtService, LeadService],
+  providers: [
+    ContactService,
+    TokenService,
+    JwtService,
+    ContactAdminStrategy,
+    ContactSalestrategy,
+    {
+      provide: 'CONTACT_STRATEGIES',
+      useFactory: (admin: ContactAdminStrategy, sales: ContactSalestrategy) => [
+        admin,
+        sales,
+      ],
+      inject: [ContactAdminStrategy, ContactSalestrategy],
+    },
+
+    {
+      provide: ContactStrategyFactory,
+      useFactory: (straregies) => new ContactStrategyFactory(straregies),
+      inject: ['CONTACT_STRATEGIES'],
+    },
+  ],
 })
 export class ContactModule {}

@@ -48,7 +48,7 @@ export class AuthService {
       throw new NotFoundException('In-Valid email or password');
 
     return this._TokenService.generateToken(
-      { email: user.email, id: user.id, role: user.role },
+      { email: user.email, id: user.id, role: user.role, name: user.name },
       {
         secret: process.env.JWT_SECRET_KEY,
         expiresIn: Number(process.env.TOKEN_EXPIRE_TIME) || '1d',
